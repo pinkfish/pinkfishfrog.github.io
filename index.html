@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Gear Solver</title>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous">
+	<link rel="stylesheet" href="OpenJsCad/openjscad.css" type="text/css">
+	<style>
+	
+	.gearThumbnail {
+		display: inline-block;
+		padding: 2em;
+	}
+	
+	.gearThumbnail>img {
+		display: block;
+		margin-left:auto;
+		margin-right:auto;
+		max-width: 150px;
+	}
+	
+	[ng\:cloak], [ng-cloak], [data-ng-cloak], [x-ng-cloak], .ng-cloak, .x-ng-cloak {
+	  display: none !important;
+	}
+	
+	.ng-invalid.form-control {
+	    border-color: #a94442;
+	    -webkit-box-shadow: inset 0 1px 1px rgba(0,0,0,.075);
+	    box-shadow: inset 0 1px 1px rgba(0,0,0,.075);
+	}
+	
+	.downloadLink {
+		text-align: center;
+	}
+	
+	polygon, polyline {
+		stroke: black;
+		fill: transparent;
+	}
+	
+	</style>
+</head>
+<body ng-app="GearSolverApp">
+	<div class="container">
+		<div class="row" ng-cloak ng-controller="GearSolverCtrl">
+			<form name="form" class="col-md-3">
+			  <div class="form-group">
+			    <label for="ratio">Ratio</label>
+			    <input type="number" class="form-control input-sm" id="ratio" min="0" step="0.000000000000001" ng-model="options.ratio" />
+			  </div>
+			  <div class="form-group">
+			    <label for="timeout">Timeout (milliseconds)</label>
+			    <input type="number" class="form-control input-sm" id="timeout" min="1000" max="60000" step="1" ng-model="options.timeout" />
+			  </div>
+			  <!--<div class="form-group">-->
+			  <!--  <label for="precision">Precision (number of decimal points)</label>-->
+			  <!--  <input type="number" class="form-control" id="precision" min="0" max="15" step="1" ng-model="options.precision" />-->
+			  <!--</div>-->
+			  <div class="form-group">
+			    <label for="maxDepth">Max Search Depth (higher numbers may timeout, and make larger gear trains)</label>
+			    <input type="number" class="form-control input-sm" id="maxDepth" min="1" max="100" step="1" ng-model="options.maxDepth" />
+			  </div>
+			  <div class="form-group">
+			    <label for="minTeeth">Minimum Allowed Teeth</label>
+			    <input type="number" class="form-control input-sm" id="minTeeth" min="4" step="1" ng-model="options.minTeeth" />
+			  </div>
+			  <div class="form-group">
+			    <label for="maxTeeth">Maximum Allowed Teeth</label>
+			    <input type="number" class="form-control input-sm" id="maxTeeth" min="5" step="1" ng-model="options.maxTeeth" />
+			  </div>
+			  <div class="form-group">
+			    <label for="minCircularPitch">Circular Pitch (this describes the tooth size)</label>
+			    <input type="number" class="form-control input-sm" id="minCircularPitch" step="0.00001" ng-model="options.minCircularPitch" />
+			  </div>
+			  <div class="form-group">
+			    <label for="pressureAngle">Pressure Angle</label>
+			    <input type="number" class="form-control input-sm" id="pressureAngle" step="0.00001" ng-model="options.pressureAngle" />
+			  </div>
+			  <div class="form-group">
+			    <label for="centerHoleDiameter">Center Hole Diameter (inches)</label>
+			    <input type="number" class="form-control input-sm" id="centerHoleDiameter" step="0.00001" ng-model="options.centerHoleDiameter" />
+			  </div>
+			  <div class="checkbox">
+			    <label><input type="checkbox" ng-model="options.allowFixedRing"/> Allow Fixed Ring Planetary</label>
+				<label><input type="checkbox" ng-model="options.allowFixedSun"/> Allow Fixed Sun Planetary</label>
+				<label><input type="checkbox" ng-model="options.allowFixedPlanet"/> Allow Fixed Planet Planetary</label>
+				<label><input type="checkbox" ng-model="options.allowSpur"/> Allow Non-Planetary Spur</label>
+			  </div>
+			  <button type="submit" class="btn btn-default" ng-disabled="!form.$valid" ng-click="solve()">
+			  	{{isStale ? '*' : ''}} Solve
+			  </button>
+			  <p>
+			  	Created by Justin Overton Copyright &copy; 2016.<br />
+			  	Source code can be found on GitHub at <a href="https://github.com/justinoverton/GearFinderJs">https://github.com/justinoverton/GearFinderJs</a>.<br />
+			  	I couldn't have done the rendering without Dr. Rainer Hessmer's gear rendering code from <a href="https://github.com/rainerhessmer/drh-horology/tree/BrowserBased/csg">https://github.com/rainerhessmer/drh-horology/tree/BrowserBased/csg</a>.
+			  	<br />
+			  	In the future I plan to auto adjust each gear's circular pitch/module/diametral pitch so that compound gears can connect within
+			  	a similar distance of one another within the train. Ex. a multi-stage planetary gear train would all have the same ring size.
+			  </p>
+			</form>
+			
+			<div class="col-md-9" ng-show="isSolved">
+				<div ng-show="!train">No solution or timed out</div>
+				<div ng-show="train">
+					<p>
+						<strong>Solution for a compound gear train with the ratio {{options.ratio}}</strong><br />
+						Each row is a single set of gears that should be compounded into the next set. 
+						(Thumbnails are scaled to fit and sizes are not relative to eachother)
+					</p>
+					<ul ng-repeat="g in train track by $index">
+						<li>
+							<span ng-if="g.type == 'planetary'">
+								Planetary (
+									Ring: {{g.r}}, 
+									Sun: {{g.s}}, 
+									Planet: {{g.p}}) (Input: {{g.inputGear}}, Output: {{g.outputGear}}, Fixed: {{g.fixedGear}}) (Ratio: {{g.ratio}})
+							</span>
+							<span ng-if="g.type == 'spur'">
+								Spur Pair (
+									T1: {{g.a}}, 
+									T2: {{g.b}}) (Ratio: {{g.ratio}})
+							</span>
+							<div>
+							  <div class="gearThumbnail" ng-repeat="(k,v) in g.gears track by $index">
+							      <img ng-src="{{v.svgUrl()}}" />
+							      <div class="downloadLink"><a ng-href="{{v.svgUrl()}}" download="{{g.type}}_{{$index}}_{{k}}_{{v.toothCount}}.svg">{{k}} {{v.toothCount}} teeth</a></div>
+							  </div>
+							</div>
+						</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+	</div>
+	<script type="text/javascript" src="OpenJsCad/lightgl.js" ></script>
+	<script type="text/javascript" src="OpenJsCad/csg.js"></script>
+	<script type="text/javascript" src="OpenJsCad/openjscad.js"></script>
+    
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.5/angular.min.js"></script>
+	<script src="gearRender.js"></script>
+	<script src="gearSolver.js"></script>
+	
+	<script type="text/javascript">
+		
+	</script>
+	
+</body>
+</html>
